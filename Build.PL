@@ -10,6 +10,9 @@ my $builder = Module::Build->new(
     build_requires => {
         'Test::Simple' => 0.62,
     },
+    requires => {
+        'perl' => '5.6.0',
+    },
     add_to_cleanup      => [ 'Test-Command-*' ],
     create_makefile_pl  => 'traditional',
     meta_merge          => {

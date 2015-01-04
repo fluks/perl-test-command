@@ -9,6 +9,7 @@ WriteMakefile
           'VERSION_FROM' => 'lib/Test/Command.pm',
           'PREREQ_PM' => {
                            'Test::Simple' => '0.62'
-                         }
+                         },
+          'MIN_PERL_VERSION' => '5.6.0',
         )
 ;
