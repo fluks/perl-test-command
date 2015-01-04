@@ -36,7 +36,7 @@ is( Test::Command::_slurp($test_perl->stdout_file), "foo\nbar\n", "stdout_file" 
 $test_perl->stdout_is_eq("foo\nbar\n");
 $test_perl->stdout_isnt_eq("bar\nfoo\n");
 {
-local $^W;
+local $SIG{__WARN__} = \&ignore_numeric_warning;
 $test_perl->stdout_is_num(0);
 $test_perl->stdout_isnt_num(1);
 }
@@ -50,7 +50,7 @@ is( Test::Command::_slurp($test_perl->stderr_file), "bar\nfoo\n", "stderr_file" 
 $test_perl->stderr_is_eq("bar\nfoo\n");
 $test_perl->stderr_isnt_eq("foo\nbar\n");
 {
-local $^W;
+local $SIG{__WARN__} = \&ignore_numeric_warning;
 $test_perl->stderr_is_num(0);
 $test_perl->stderr_isnt_num(1);
 }
@@ -74,6 +74,13 @@ is(ref $test_perl, 'Test::Command', 'ref $test_perl');
 $test_perl->exit_is_num(0);
 $test_perl->stdout_is_eq("foo\nbar\n");
 $test_perl->stderr_is_eq("bar\nfoo\n");
+
+## ignore warnings about using numeric equality operator on non-numeric values
+sub ignore_numeric_warning
+   {
+   return if $_[0] =~ /numeric/;
+   warn @_;
+   }
 
 package Test::Command::Derived;
 
