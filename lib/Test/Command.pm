@@ -95,8 +95,8 @@ Test the exit status, signal, STDOUT or STDERR of an external command.
 
    $cmd = 'echo err >&2';
 
-   stderr_like($cmd, /err/);
-   stderr_unlike($cmd, /rre/);
+   stderr_like($cmd, qr/err/);
+   stderr_unlike($cmd, '/rre/');
    stderr_cmp_ok($cmd, 'eq', "err\n");
 
    ## run-once-test-many-OO-style
