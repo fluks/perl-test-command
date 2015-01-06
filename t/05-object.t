@@ -1,6 +1,6 @@
 #!perl
 
-use Test::More tests => 38;
+use Test::More tests => 41;
 
 use Test::Command;
 
@@ -58,6 +58,12 @@ $test_perl->stderr_like(qr/BAR\nFOO/i);
 $test_perl->stderr_unlike(qr/BAR\nFOO/);
 $test_perl->stderr_cmp_ok('ne', "foo\nbar\n");
 $test_perl->stderr_is_file("$FindBin::Bin/stderr.txt");
+
+my $time = $test_perl->time_value;
+ok( $time > 0.0001 && $time < 0.1, 'command ran between 0.0001 and 0.1 seconds' );
+
+$test_perl->time_gt(0.0001);
+$test_perl->time_lt(0.1);
 
 ## test object with ARRAY ref command
 

@@ -5,6 +5,7 @@ use strict;
 
 use Carp qw/ confess /;
 use File::Temp qw/ tempfile /;
+use Time::HiRes qw/ gettimeofday tv_interval /;
 
 use base 'Test::Builder::Module';
 
@@ -45,6 +46,9 @@ our @EXPORT = qw(
    stderr_cmp_ok
    stderr_is_file
 
+   time_lt
+   time_gt
+   time_value
    );
                   
 =head1 NAME
@@ -99,6 +103,13 @@ Test the exit status, signal, STDOUT or STDERR of an external command.
    stderr_unlike($cmd, /rre/);
    stderr_cmp_ok($cmd, 'eq', "err\n");
 
+   ## testing time
+
+   $cmd = 'sleep 2';
+
+   time_lt($cmd, 2.5);  ## floating-point accuracy
+   time_gt($cmd, 1.5);
+
    ## run-once-test-many-OO-style
    ## the first test lazily runs command
    ## the second test uses cached results
@@ -115,12 +126,14 @@ Test the exit status, signal, STDOUT or STDERR of an external command.
 
    ## arbitrary results inspection
 
-   is( $echo_test->exit_value, 0,         'echo exit' );
-   is( $echo_test->signal_value, undef,   'echo signal' );
-   is( $echo_test->stdout_value, "out\n", 'echo stdout' );
-   is( $echo_test->stderr_value, '',      'echo stderr' );
-   is( -s $echo_test->stdout_file, 4,     'echo stdout file size' );
-   is( -s $echo_test->stderr_file, 0,     'echo stderr file size' );
+   is( $echo_test->exit_value, 0,          'echo exit' );
+   is( $echo_test->signal_value, undef,    'echo signal' );
+   is( $echo_test->stdout_value, "out\n",  'echo stdout' );
+   is( $echo_test->stderr_value, '',       'echo stderr' );
+   is( -s $echo_test->stdout_file, 4,      'echo stdout file size' );
+   is( -s $echo_test->stderr_file, 0,      'echo stderr file size' );
+   ok( $echo_test->time_value > 0.00001 &&
+       $echo_test->time_value < 0.01,      'command ran between 0.00001 and 0.01 seconds' );
 
 =head1 DESCRIPTION
 
@@ -223,6 +236,7 @@ sub run
    $self->{'result'}{'term_signal'} = $run_info->{'term_signal'};
    $self->{'result'}{'stdout_file'} = $run_info->{'stdout_file'};
    $self->{'result'}{'stderr_file'} = $run_info->{'stderr_file'};
+   $self->{'result'}{'time_delta'}  = $run_info->{'time_delta'};
 
    return $self;
 
@@ -409,8 +423,12 @@ sub _run_cmd
    open STDOUT, '>&' . fileno $temp_stdout_fh or confess 'Cannot duplicate temporary STDOUT';
    open STDERR, '>&' . fileno $temp_stderr_fh or confess 'Cannot duplicate temporary STDERR';
 
+   my $t0 = [ gettimeofday() ];
+
    ## run the command
    system(@{ $cmd });
+
+   my $t_delta = tv_interval($t0);
    
    my $system_return = defined ${^CHILD_ERROR_NATIVE} ? ${^CHILD_ERROR_NATIVE} : $?; 
    
@@ -438,7 +456,8 @@ sub _run_cmd
    return { exit_status => $exit_status,
             term_signal => $term_signal,
             stdout_file => $temp_stdout_file,
-            stderr_file => $temp_stderr_file };
+            stderr_file => $temp_stderr_file,
+            time_delta  => $t_delta, };
 
    }
 
@@ -1162,6 +1181,68 @@ EOD
    return $is_ok;
    }
 
+=head2 Testing time
+
+The test routines below measure the running time of the command.
+
+=head3 time_lt
+
+  time_lt($cmd, $seconds, $name)
+
+If running the command takes less than given seconds, this passes. Otherwise
+it fails.
+
+=cut
+
+sub time_lt
+   {
+   my ($cmd, $seconds, $name) = @_;
+
+   my $result = _get_result($cmd);
+
+   $name = _build_name($name, @_);
+
+   return __PACKAGE__->builder->cmp_ok($result->{time_delta}, '<', $seconds, $name);
+   }
+
+=head3 time_gt
+
+   time_gt($cmd, $seconds, $name)
+
+If running the command takes more than given seconds, this passes. Otherwise
+it fails.
+
+=cut
+
+sub time_gt
+   {
+   my ($cmd, $seconds, $name) = @_;
+
+   my $result = _get_result($cmd);
+
+   $name = _build_name($name, @_);
+
+   return __PACKAGE__->builder->cmp_ok($result->{time_delta}, '>', $seconds, $name);
+   }
+
+=head3 time_value
+
+   time_value($cmd)
+
+Return the time it took to run the command. Useful for performing arbitrary tests
+not covered by this module.
+
+=cut
+
+sub time_value
+   {
+   my ($cmd) = @_;
+
+   my $result = _get_result($cmd);
+
+   return $result->{time_delta};
+   }
+
 =head1 AUTHOR
 
 Daniel B. Boorstein, C<< <danboo at cpan.org> >>
@@ -1235,10 +1316,6 @@ under the same terms as Perl itself.
 =item * potential test functions:
 
 =over 3
-
-=item * time_lt($cmd, $seconds)
-
-=item * time_gt($cmd, $seconds)
 
 =item * stdout_line_custom($cmd, \&code)
 
